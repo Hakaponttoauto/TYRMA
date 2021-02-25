@@ -1,0 +1,8 @@
+'map', (0, 64751)
+'objects', (65024, 1570)
+'player_index', (67072, 5)
+'inventory', (67584, 6)
+'game_msgs', (68096, 294)
+'game_state', (68608, 14)
+'stairs_index', (69120, 5)
+'dungeon_level', (69632, 5)
