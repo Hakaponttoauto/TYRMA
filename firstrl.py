@@ -949,12 +949,9 @@ def handle_keys():
 
         elif key_char == 'c' or key.vk == libtcod.KEY_KP3:
             player_move_or_attack(1, 1)
-
-        elif key.vk == libtcod.KEY_KP5:
-            pass  #do nothing ie wait for the monster to come to you
         else:
             #test for other keys
-            if key_char == 'g':
+            if key_char == 'o':
                 #pick up an item
                 upped=False
                 for object in objects:  #look for an item in the player's tile
@@ -964,23 +961,28 @@ def handle_keys():
                         break
                 if not upped:
                     message('Maassa ei ole otettavaa.',libtcod.dark_red)
+                    return 'didnt-take-turn'
             if key_char == 'r':
                 #show the inventory; if an item is selected, use it
                 chosen_item = inventory_menu('Paina esineen nappia kuluttaaksesi esineen, tai jotakin muuta peruuttaaksesi.\n')
                 if chosen_item is not None:
                     chosen_item.use()
+                else:
+                    return 'didnt-take-turn'
             if key_char == 't':
                 #show the inventory; if an item is selected, drop it
                 chosen_item = inventory_menu('Paina esineen nappia tiputtaaksesi esineen, tai jotakin muuta peruuttaaksesi.\n')
                 if chosen_item is not None:
                     chosen_item.drop()
+                else:
+                    return 'didnt-take-turn'
             if key_char == 'p':
                 #go down stairs, if the player is on them
                 if stairs.x == player.x and stairs.y == player.y:
                     next_level()
                 else:
                     message('Maassa ei ole portaita joita kulkea alas.',libtcod.dark_red)
-            return 'didnt-take-turn'
+                    return 'didnt-take-turn'
 
 
 def message(new_msg, color = libtcod.white):
