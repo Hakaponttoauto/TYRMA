@@ -485,7 +485,7 @@ objects_list={
 
 }
 spawn={
-    1: {"monsters":2,"monster":{"Morko":99,"Kyrssi":1},"items":1,"item":{"Impostor_kakku":90,"Kakku":10}},
+    1: {"monsters":2,"monster":{"Morko":99,"Kyrssi":1},"items":1,"item":{"Taikajuoma":90,"Kakku":10}},
     3: {"monsters":3,"monster":{"Morko":99,"Kyrssi":1},"items":3,"item":{"Puukko":20,"Taikajuoma":80}},
     5: {"monsters":4,"monster":{"Morko":90,"Kyrssi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10,"Taikajuoma":50,"Miekka":20,"Kakku":10,"Impostor_kakku":10}},
     9: {"monsters":3,"monster":{"Morko":80,"Kyrssi":18,"Tomuttaja":2},"items":1,"item":{"Kilpi":1,"Taikajuoma":88,"Miekka":1,"Impostor_kakku":10}},
