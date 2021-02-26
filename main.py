@@ -52,88 +52,13 @@ color_dark_wall = libtcod.Color(50, 50, 50)
 color_light_wall = libtcod.Color(120,110,100)
 color_dark_ground = libtcod.Color(30, 30, 40)
 color_light_ground = libtcod.Color(60,55,50)
-colors={"RED":libtcod.red,"GREEN":libtcod.green,"BLUE":libtcod.blue,"GRAY":libtcod.gray,"WHITE":libtcod.white,"PURPLE":libtcod.purple}
 
-objects_list={}
-spawn={}
-spells={}
-
-def loaddesc(file):
-    global objects_list, spawn,spells
-    desc=open(file,"r").readlines()
-    info={"type":None,"symbol":None,"name":None,"ai":None,"power_bonus":0,"hp_bonus":0,"defense_bonus":0,"xp":None,"power":None,"defense":0,"health":None,"color":"WHITE","use":None,"items":0,"monsters":0,"cast":None}
-    object=None
-    for line in desc:
-        line=line.strip().rstrip()
-        component=line.split(" ")
-        if component[0]=="DEFINE":
-            if component[1]=="ITEM":
-                info["type"]="item"
-            if component[1]=="EQUIPMENT":
-                info["type"]="equipment"
-            elif component[1]=="MONSTER":
-                info["type"]="monster"
-            elif component[1]=="SPELL":
-                info["type"]="spell"
-            elif component[1]=="FLOOR":
-                info["type"]="floor"
-                spawn[int(component[2])]={"MONSTER":{},"ITEM":{}}
-            info["name"]=" ".join(component[2:])
-        elif component[0]=="END":
-            if info["type"]=="monster" or info["type"]=="item" or info["type"]=="equipment":
-                ai_component=None
-                fighter_component=None
-                equipment_component=None
-                item_component=None
-                block=True
-                if info["type"]=="monster":
-                    fighter_component=Fighter(hp=info["health"], defense=info["defense"], power=info["power"], xp=info["xp"], death_function=monster_death)
-                    block=True
-                    if info["ai"]=="advanced":
-                        ai_component = AdvancedMonster()
-                    else:
-                        ai_component = BasicMonster()
-                elif info["type"]=="item":
-                    block=False
-                    item_component = Item(use_function=info["cast"])
-                elif info["type"]=="equipment":
-                    block=False
-                    equipment_component = Equipment(slot=info["slot"], power_bonus=info["power_bonus"],max_hp_bonus=info["hp_bonus"], defense_bonus=info["defense_bonus"])
-                if info["symbol"] is not None:
-                    symbol=info["symbol"]
-                else:
-                    symbol=info["name"][0]
-
-                object=Object(0, 0, symbol, info["name"], colors[info["color"]],blocks=block, fighter=fighter_component, ai=ai_component, item=item_component, equipment=equipment_component)
-                objects_list[object.name]=object
-                object=None
-            elif info["type"]=="spell":
-                spells[info["name"]]=copy.deepcopy(info)
-            elif info["type"]=="floor":
-                spawn[int(info["name"])]["ITEMS"]=info["items"]
-                spawn[int(info["name"])]["MONSTERS"]=info["monsters"]
-            info={"type":None,"symbol":None,"name":None,"ai":None,"power_bonus":0,"hp_bonus":0,"defense_bonus":0,"xp":None,"power":None,"defense":0,"health":None,"color":"WHITE","use":None,"items":0,"monsters":0,"cast":None}
-        elif component[0]=="SPAWN":
-            spawn[int(info["name"])][component[1]][component[2]]=int(component[3])
-        elif component[0] != "":
-            if component[1].isnumeric():
-                info[component[0].lower()]=int(component[1])
-            else:
-                info[component[0].lower()]=" ".join(component[1:])
 def clamp(minimum, x, maximum):
     return max(minimum, min(x, maximum))
 
-def execute_spell(spell,caster):
-    spell=spells[spell]
-    if spell["target"]=="CASTER":
-        if spell["change"]=="HEALTH":
-            caster.fighter.hp=clamp(0,caster.fighter.hp+float(spell["amount"]),caster.fighter.max_hp)
-
 def new_game():
     global player, inventory, game_msgs, game_state, dungeon_level
-    loaddesc("def/levels.TYRM")
-    loaddesc("def/items.TYRM")
-    loaddesc("def/monsters.TYRM")
+
     name="Seikkailija"
         #create object representing the player
     fighter_component = Fighter(hp=30, defense=2, power=5, xp=0, death_function=player_death)
@@ -199,15 +124,6 @@ def load_game():
     initialize_fov()
 
 
-def cast_heal():
-    #heal the player
-    if player.fighter.hp == player.fighter.max_hp:
-        message('Olet jo elinvoimainen.', libtcod.sepia)
-        return 'cancelled'
-
-    message('Haavasi alkavat tuntua paremmilta!', libtcod.green)
-    player.fighter.heal(HEAL_AMOUNT)
-
 def check_level_up():
     #see if the player's experience is enough to level-up
     level_up_xp = LEVEL_UP_BASE + player.level * LEVEL_UP_FACTOR
@@ -262,14 +178,16 @@ class Rect:
 class Object:
     #this is a generic object: the player, a monster, an item, the stairs...
     #it's always represented by a character on screen.
-    def __init__(self, x, y, char, name, color, blocks=False, fighter=None, ai=None, item=None, equipment=None, player=False):
+    def __init__(self, x, y, char, name, color, blocks=False, actions={}, fighter=None, ai=None, item=None, equipment=None, player=False):
         self.name = name
         self.blocks = blocks
         self.x = x
         self.y = y
         self.char = char
         self.color = color
-        self.player=player
+        self.player = player
+
+        self.actions=actions
 
         self.fighter = fighter
         if self.fighter:  #let the fighter component know who owns it
@@ -292,11 +210,17 @@ class Object:
 
     def move(self, dx, dy):
         #move by the given amount, if the destination is not blocked
-        if not is_blocked(self.x + dx, self.y + dy):
+        blocking=is_blocked(self.x + dx, self.y + dy)
+        if blocking==None:
             self.x += dx
             self.y += dy
+            bump = get_object(self.x + dx, self.y + dy)
+            if bump!=None and "bump" in bump.actions:
+                bump.actions[bump](self)
             return True
         else:
+            if blocking!=True and "bump" in blocking.actions:
+                blocking.actions["bump"](self)
             return False
 
     def draw(self):
@@ -408,7 +332,6 @@ class BasicMonster:
 class AdvancedMonster:
     #AI for a basic monster.
     def take_turn(self):
-        #a basic monster takes its turn. If you can see it, it can see you
         monster = self.owner
         try:
             if self.path==None:
@@ -427,8 +350,9 @@ class AdvancedMonster:
 
 class Item:
     #an item that can be picked up and used.
-    def __init__(self, use_function=None):
+    def __init__(self, use_function=None,use_arguments=None):
         self.use_function = use_function
+        self.use_arguments = use_arguments
     def pick_up(self):
         #add to the player's inventory and remove from the map
         if len(inventory) >= 26:
@@ -446,7 +370,7 @@ class Item:
         if self.use_function is None:
             message(self.owner.name + 'a ei voi kuluttaa.', libtcod.sepia)
         else:
-            if execute_spell(self.use_function,player) != 'cancelled':
+            if self.use_function(player,self,self.use_arguments) != 'cancelled':
                 inventory.remove(self.owner)  #destroy after use, unless it was cancelled for some reason
     def drop(self):
         #add to the map and remove from the player's inventory. also, place it at the player's coordinates
@@ -527,6 +451,46 @@ def monster_death(monster):
     monster.name = monster.name + "n ruumis"
     monster.send_to_back()
 
+spells={}
+def spell_heal(caster,parent,arguments=[10]):
+    #heal the player
+    if caster.fighter.hp == caster.fighter.max_hp:
+        message('Olet jo elinvoimainen.', libtcod.sepia)
+        return 'cancelled'
+    message('Haavasi alkavat tuntua paremmilta!', libtcod.green)
+    caster.fighter.heal(arguments[0])
+
+def spell_eat(caster,parent,arguments=[10]):
+    if caster.fighter.hp == caster.fighter.max_hp:
+        message('Vatsasi on jo pullollaan.', libtcod.sepia)
+        return 'cancelled'
+    message('Ahdat '+parent.owner.name+'a naamaasi, namskis maiskis lurpsis!', libtcod.green)
+    caster.fighter.heal(arguments[0])
+
+def spell_explode(caster,parent,arguments):
+    message('KAPYYM!!!!!!! '+parent.owner.name+' posahti!', libtcod.red)
+    caster.fighter.take_damage(60-(caster.fighter.defense*2))
+
+objects_list={
+    "Morko": Object(0, 0, "M", "Morko", libtcod.green,blocks=True, fighter=Fighter(hp=10, defense=0, power=5, xp=50, death_function=monster_death), ai=BasicMonster()),
+    "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, defense=10, power=10, xp=100, death_function=monster_death), ai=BasicMonster()),
+    "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, defense=10, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
+
+    "Taikajuoma": Object(0, 0, "!", "Taikajuoma", libtcod.purple,blocks=False, item = Item(use_function=spell_heal,use_arguments=[10])),
+    "Puukko": Object(0, 0, "/", "Puukko", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=2)),
+    "Miekka": Object(0, 0, "/", "Miekka", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=5)),
+    "Kilpi": Object(0, 0, "[", "Kilpi", libtcod.white, blocks=False, equipment=Equipment("vasen nyrkki", defense_bonus=5)),
+    "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, item=Item(use_function=spell_eat,use_arguments=[20])),
+    "Impostor_kakku": Object(0, 0, "%", "Kakku", libtcod.gray, blocks=False, item=Item(use_function=spell_explode)),
+
+}
+spawn={
+    1: {"monsters":2,"monster":{"Morko":99,"Kyrssi":1},"items":1,"item":{"Impostor_kakku":90,"Kakku":10}},
+    3: {"monsters":3,"monster":{"Morko":99,"Kyrssi":1},"items":3,"item":{"Puukko":20,"Taikajuoma":80}},
+    5: {"monsters":4,"monster":{"Morko":90,"Kyrssi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10,"Taikajuoma":50,"Miekka":20,"Kakku":10,"Impostor_kakku":10}},
+    9: {"monsters":3,"monster":{"Morko":80,"Kyrssi":18,"Tomuttaja":2},"items":1,"item":{"Kilpi":1,"Taikajuoma":88,"Miekka":1,"Impostor_kakku":10}},
+}
+
 def from_dungeon_level(table):
     #returns a value that depends on level. the table specifies what value occurs after each level, default is 0.
     for (value, level) in reversed(table):
@@ -560,6 +524,7 @@ def player_move_or_attack(dx, dy):
     if items!=None:
         message('Maassa on '+items, libtcod.sepia)
     return r
+
 def get_names(x,y):
     #create a list with the names of all objects at the mouse's coordinates and in FOV
     names = [obj.name for obj in objects
@@ -579,9 +544,15 @@ def is_blocked(x, y):
     #now check for any blocking objects
     for object in objects:
         if object.blocks and object.x == x and object.y == y:
-            return True
+            return object
 
-    return False
+    return None
+
+def get_object(x, y):
+    for object in objects:
+        if object.x == x and object.y == y:
+            return object
+    return None
 
 
 def create_room(room):
@@ -619,10 +590,10 @@ def place_objects(room):
     level=dungeon_level
     while error:
         try:
-            max_monsters = spawn[level]["MONSTERS"]
-            monster_chances = spawn[level]["MONSTER"]
-            max_items = spawn[level]["ITEMS"]
-            item_chances = spawn[level]["ITEM"]
+            max_monsters = spawn[level]["monsters"]
+            monster_chances = spawn[level]["monster"]
+            max_items = spawn[level]["items"]
+            item_chances = spawn[level]["item"]
             error=False
         except KeyError:
             level-=1
@@ -634,7 +605,7 @@ def place_objects(room):
         #choose random spot for this monster
         x = libtcod.random_get_int(0, room.x1+1, room.x2-1)
         y = libtcod.random_get_int(0, room.y1+1, room.y2-1)
-        if not is_blocked(x, y):
+        if is_blocked(x, y)==None:
             choice=random_choice(monster_chances)
             monster=copy.deepcopy(objects_list[choice])
             monster.x=x
@@ -647,7 +618,7 @@ def place_objects(room):
         x = libtcod.random_get_int(0, room.x1+1, room.x2-1)
         y = libtcod.random_get_int(0, room.y1+1, room.y2-1)
         #only place it if the tile is not blocked
-        if not is_blocked(x, y):
+        if is_blocked(x, y)==None:
             choice=random_choice(item_chances)
             item=copy.deepcopy(objects_list[choice])
             item.x=x
@@ -966,27 +937,30 @@ def handle_keys():
                 if not upped:
                     message('Maassa ei ole otettavaa.',libtcod.dark_red)
                     return 'didnt-take-turn'
-            if key_char == 'r':
+            elif key_char == 'r':
                 #show the inventory; if an item is selected, use it
                 chosen_item = inventory_menu('Paina esineen nappia kuluttaaksesi esineen, tai jotakin muuta peruuttaaksesi.\n')
                 if chosen_item is not None:
                     chosen_item.use()
                 else:
                     return 'didnt-take-turn'
-            if key_char == 't':
+            elif key_char == 't':
                 #show the inventory; if an item is selected, drop it
                 chosen_item = inventory_menu('Paina esineen nappia tiputtaaksesi esineen, tai jotakin muuta peruuttaaksesi.\n')
                 if chosen_item is not None:
                     chosen_item.drop()
                 else:
                     return 'didnt-take-turn'
-            if key_char == 'p':
+            elif key_char == 'p':
                 #go down stairs, if the player is on them
                 if stairs.x == player.x and stairs.y == player.y:
                     next_level()
                 else:
                     message('Maassa ei ole portaita joita kulkea alas.',libtcod.dark_red)
                     return 'didnt-take-turn'
+            else:
+                message('Painiketta ei tunnistettu',libtcod.dark_red)
+                return 'didnt-take-turn'
         if not r:
             message('Osut muuriin.',libtcod.dark_red)
             return 'didnt-take-turn'
@@ -1012,7 +986,7 @@ def message(new_msg, color = libtcod.white):
             y += 1
         libtcod.console_blit(panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, PANEL_Y)
         libtcod.console_flush()
-        time.sleep(0.5)
+        time.sleep(0.2)
 
 def msgbox(text, width=50):
     menu(text, [], width)  #use menu() as a sort of "message box"
