@@ -295,6 +295,9 @@ class Object:
         if not is_blocked(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
+            return True
+        else:
+            return False
 
     def draw(self):
         #only show if it's visible to the player
@@ -516,7 +519,7 @@ def monster_death(monster):
     #transform it into a nasty corpse! it doesn't block, can't be
     #attacked and doesn't move
     message(monster.name.capitalize() + ' kukistui!',libtcod.green)
-    monster.char = '_'
+    monster.char = '%'
     monster.color = libtcod.dark_red
     monster.blocks = False
     monster.fighter = None
@@ -546,16 +549,17 @@ def player_move_or_attack(dx, dy):
             break
 
     #attack if target found, move otherwise
+    r=True
     if target is not None:
         player.fighter.attack(target)
     else:
-        player.move(dx, dy)
+        r=player.move(dx, dy)
         fov_recompute = True
 
     items=get_names(player.x,player.y)
     if items!=None:
         message('Maassa on '+items, libtcod.sepia)
-
+    return r
 def get_names(x,y):
     #create a list with the names of all objects at the mouse's coordinates and in FOV
     names = [obj.name for obj in objects
@@ -877,7 +881,7 @@ def render_all():
     libtcod.console_set_default_foreground(panel, libtcod.white)
     libtcod.console_print_ex(panel, 1, 4, libtcod.BKGND_NONE, libtcod.LEFT, 'Tyrmien syvyys ' + str(dungeon_level))
     libtcod.console_set_default_foreground(panel, libtcod.yellow)
-    libtcod.console_print_ex(panel, 1, 2, libtcod.BKGND_NONE, libtcod.LEFT, 'Voima/Puolustus: ' + str(player.fighter.power) + '/' + str(player.fighter.defense))
+    libtcod.console_print_ex(panel, 1, 2, libtcod.BKGND_NONE, libtcod.LEFT, 'Voima/Suoja: ' + str(player.fighter.power) + '/' + str(player.fighter.defense))
     libtcod.console_print_ex(panel, 1, 3, libtcod.BKGND_NONE, libtcod.LEFT, 'Kokemus: ' + str(player.level))
 
     #print the game messages, one line at a time
@@ -923,32 +927,32 @@ def handle_keys():
 
     elif key.vk == libtcod.KEY_ESCAPE:
         return 'exit'
-
+    r=True
     #movement keys
     if game_state == 'playing':
         if key_char == 'w' or key.vk == libtcod.KEY_KP8:
-            player_move_or_attack(0, -1)
+            r=player_move_or_attack(0, -1)
 
         elif key_char == 's' or key.vk == libtcod.KEY_KP2:
-            player_move_or_attack(0, 1)
+            r=player_move_or_attack(0, 1)
 
         elif key_char == 'a' or key.vk == libtcod.KEY_KP4:
-            player_move_or_attack(-1, 0)
+            r=player_move_or_attack(-1, 0)
 
         elif key_char == 'd' or key.vk == libtcod.KEY_KP6:
-            player_move_or_attack(1, 0)
+            r=player_move_or_attack(1, 0)
 
         elif key_char == 'q' or key.vk == libtcod.KEY_KP7:
-            player_move_or_attack(-1, -1)
+            r=player_move_or_attack(-1, -1)
 
         elif key_char == 'e' or key.vk == libtcod.KEY_KP9:
-            player_move_or_attack(1, -1)
+            r=player_move_or_attack(1, -1)
 
         elif key_char == 'z' or key.vk == libtcod.KEY_KP1:
-            player_move_or_attack(-1, 1)
+            r=player_move_or_attack(-1, 1)
 
         elif key_char == 'c' or key.vk == libtcod.KEY_KP3:
-            player_move_or_attack(1, 1)
+            r=player_move_or_attack(1, 1)
         else:
             #test for other keys
             if key_char == 'o':
@@ -983,7 +987,9 @@ def handle_keys():
                 else:
                     message('Maassa ei ole portaita joita kulkea alas.',libtcod.dark_red)
                     return 'didnt-take-turn'
-
+        if not r:
+            message('Osut muuriin.',libtcod.dark_red)
+            return 'didnt-take-turn'
 
 def message(new_msg, color = libtcod.white):
     #split the message if necessary, among multiple lines
