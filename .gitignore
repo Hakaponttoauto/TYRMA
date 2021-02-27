@@ -4,3 +4,5 @@ savegame.dir
 savegame.bak
 savegame.dat
 savegame.dir
+build
+setup.py
