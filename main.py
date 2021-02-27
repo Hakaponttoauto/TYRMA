@@ -79,6 +79,9 @@ def new_game():
     #a warm welcoming message!
     initialize_fov()
 
+    # -*- coding: utf-8 -*-
+    message("Astut pimeään tyrmään, tavoitteenasi löytää Urho Kekkosen kadonnut muumioitunut pää.")
+
 def initialize_fov():
     libtcod.console_clear(con)
     global fov_recompute, fov_map
@@ -214,6 +217,7 @@ class Object:
         if blocking==None:
             self.x += dx
             self.y += dy
+            self.send_to_fore()
             bump = get_object(self.x + dx, self.y + dy)
             if bump!=None and "bump" in bump.actions:
                 bump.actions[bump](self)
@@ -257,6 +261,12 @@ class Object:
         global objects
         objects.remove(self)
         objects.insert(0, self)
+
+    def send_to_fore(self):
+        #make this object be drawn first, so all others appear above it if they're in the same tile.
+        global objects
+        objects.remove(self)
+        objects.insert(len(objects),self)
 
 class Fighter:
     #combat-related properties and methods (monster, player, NPC).
@@ -765,7 +775,7 @@ def menu(header, options, width):
 def inventory_menu(header):
     #show a menu with each item of the inventory as an option
     if len(inventory) == 0:
-        options = ['Reppusi on autio.']
+        options = ['Reppusi on tyhjä.']
     else:
         options = []
         for item in inventory:
@@ -892,7 +902,7 @@ def handle_keys():
     key = libtcod.console_wait_for_keypress(True)  #turn-based
     key_char = chr(key.c)
 
-    if key.vk == libtcod.KEY_ENTER and key.lalt:
+    if key.vk == libtcod.KEY_F11:
         #Alt+Enter: toggle fullscreen
         libtcod.console_set_fullscreen(not libtcod.console_is_fullscreen())
 
@@ -959,7 +969,7 @@ def handle_keys():
                     message('Maassa ei ole portaita joita kulkea alas.',libtcod.dark_red)
                     return 'didnt-take-turn'
             else:
-                message('Painiketta ei tunnistettu',libtcod.dark_red)
+                message('Nappia ei tunnistettu',libtcod.dark_red)
                 return 'didnt-take-turn'
         if not r:
             message('Osut muuriin.',libtcod.dark_red)
@@ -995,7 +1005,7 @@ def msgbox(text, width=50):
 # Initialization & Main Loop
 #############################################
 
-libtcod.console_set_custom_font('terminal10x16.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
+libtcod.console_set_custom_font('terminator10x16.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_CP437)
 libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'TYRMÄ', False)
 libtcod.sys_set_fps(LIMIT_FPS)
 con = libtcod.console_new(SCREEN_WIDTH, SCREEN_HEIGHT)
@@ -1057,7 +1067,7 @@ def main_menu():
             try:
                 load_game()
             except:
-                msgbox('\n No saved game to load.\n', 24)
+                msgbox('\n Ei tallennettua peliä.\n', 24)
                 continue
             play_game()
         elif choice == 2:  #quit
