@@ -134,7 +134,7 @@ def check_level_up():
         #it is! level up
         player.level += 1
         player.fighter.xp -= level_up_xp
-        playsound('sounds/levelup.wav')
+        playsound('assets/sounds/levelup.wav')
         message('Tunnet kokemuksesi karttuneen! Saavutat tason ' + str(player.level) + '!', libtcod.yellow)
         choice=libtcod.random_get_int(0, 0, 2)
         if choice == 0:
@@ -287,7 +287,7 @@ class Fighter:
                 function = self.death_function
                 if function is not None:
                     function(self.owner)
-                    playsound('sounds/death.wav')
+                    playsound('assets/sounds/death.wav')
                 if self.owner != player:  #yield experience to the player
                     player.fighter.xp += self.xp
     def attack(self, target):
@@ -296,9 +296,9 @@ class Fighter:
         colorr=[libtcod.red,libtcod.green]
         if self.owner.player:
             colorr=[libtcod.green,libtcod.red]
-            playsound('sounds/playerhit.wav')
+            playsound('assets/sounds/playerhit.wav')
         else:
-            playsound('sounds/enemyhit.wav')
+            playsound('assets/sounds/enemyhit.wav')
         if damage > 0:
             #make the target take some damage
             message(random.choice(self.fight_messages).replace("@1",self.owner.name).replace("@2",target.name), colorr[0])
@@ -370,7 +370,7 @@ class Item:
         else:
             inventory.append(self.owner)
             objects.remove(self.owner)
-            playsound('sounds/pickup.wav')
+            playsound('assets/sounds/pickup.wav')
             message('Otat ' + self.owner.name + 'n maasta.', libtcod.sepia)
     def use(self):
         if self.owner.equipment:
@@ -1005,7 +1005,7 @@ def msgbox(text, width=50):
 # Initialization & Main Loop
 #############################################
 
-libtcod.console_set_custom_font('terminator10x16.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_CP437)
+libtcod.console_set_custom_font('assets/terminator10x16.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_CP437)
 libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'TYRMÄ', False)
 libtcod.sys_set_fps(LIMIT_FPS)
 con = libtcod.console_new(SCREEN_WIDTH, SCREEN_HEIGHT)
@@ -1046,7 +1046,7 @@ def play_game():
                     object.ai.take_turn()
 
 def main_menu():
-    img = libtcod.image_load('menu.png')
+    img = libtcod.image_load('assets/menu.png')
 
     while not libtcod.console_is_window_closed():
         #show the background image, at twice the regular console resolution
