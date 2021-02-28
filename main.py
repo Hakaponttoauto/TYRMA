@@ -28,13 +28,8 @@ MAP_HEIGHT = 30
 #parameters for dungeon generator
 ROOM_MAX_SIZE = 10
 ROOM_MIN_SIZE = 6
-MAX_ROOMS = 30
-MIN_ROOMS = 2
-MAX_ROOM_MONSTERS=3
-MAX_ROOM_ITEMS=1
 
-monster_chances = {'Morko': 80, 'Kyrssi': 20, 'Tomuttaja': 5}
-item_chances = {'taikajuoma': 70, 'patsas':10}
+rooms=[]
 
 FOV_ALGO = 2  #default FOV algorithm
 FOV_LIGHT_WALLS = True  #light walls or not
@@ -148,6 +143,11 @@ def check_level_up():
             player.fighter.base_defense += 1
             message('Puolustuksesi kasvaa!', libtcod.yellow)
 
+class Point:
+    def __init__(self,x,y):
+        self.x=x
+        self.y=y
+
 class Tile:
     #a tile of the map and its properties
     def __init__(self, blocked, block_sight = None):
@@ -217,7 +217,7 @@ class Object:
         if blocking==None:
             self.x += dx
             self.y += dy
-            self.send_to_fore()
+            #self.send_to_fore()
             bump = get_object(self.x + dx, self.y + dy)
             if bump!=None and "bump" in bump.actions:
                 bump.actions[bump](self)
@@ -257,16 +257,15 @@ class Object:
         return math.sqrt(dx ** 2 + dy ** 2)
 
     def send_to_back(self):
-        #make this object be drawn first, so all others appear above it if they're in the same tile.
+        #This code bugs, remember to fix it before using.
         global objects
         objects.remove(self)
         objects.insert(0, self)
 
     def send_to_fore(self):
-        #make this object be drawn first, so all others appear above it if they're in the same tile.
         global objects
         objects.remove(self)
-        objects.insert(len(objects),self)
+        objects.append(self)
 
 class Fighter:
     #combat-related properties and methods (monster, player, NPC).
@@ -301,10 +300,10 @@ class Fighter:
             playsound('assets/sounds/enemyhit.wav')
         if damage > 0:
             #make the target take some damage
-            message(random.choice(self.fight_messages).replace("@1",self.owner.name).replace("@2",target.name), colorr[0])
+            message(random.choice(self.fight_messages).replace("@1",self.owner.name).replace("@2",target.name), colorr[0],self.owner.x,self.owner.y)
             target.fighter.take_damage(damage)
         else:
-            message(random.choice(self.fight_messages).replace("@1",self.owner.name).replace("@2",target.name) + ', ilman vaikutusta!', colorr[1])
+            message(random.choice(self.fight_messages).replace("@1",self.owner.name).replace("@2",target.name) + ', ilman vaikutusta!', colorr[1],self.owner.x,self.owner.y)
 
     def heal(self, amount):
         #heal by the given amount, without going over the maximum
@@ -340,7 +339,6 @@ class BasicMonster:
             elif player.fighter.hp > 0:
                 monster.fighter.attack(player)
 class AdvancedMonster:
-    #AI for a basic monster.
     def take_turn(self):
         monster = self.owner
         try:
@@ -349,14 +347,65 @@ class AdvancedMonster:
         except:
             self.path = libtcod.path_new_using_map(path_map)
         success=libtcod.path_compute(self.path, monster.x, monster.y, player.x, player.y)
-        print(str(success))
         stepx,stepy=libtcod.path_walk(self.path,True)
         #move towards player if far away
         if monster.distance_to(player) >= 2 and success:
             monster.move(stepx-monster.x,stepy-monster.y)
         #close enough, attack! (if the player is still alive.)
         elif player.fighter.hp > 0 and monster.distance_to(player) < 2:
-                monster.fighter.attack(player)
+            monster.fighter.attack(player)
+
+class Wandering:
+    def __init__(self):
+        self.success=False
+    def randomize_target(self):
+        blocked=True
+        room = random.choice(rooms)
+        print(rooms.index(room))
+        while blocked is not None:
+            x = libtcod.random_get_int(0, room.x1+1, room.x2-1)
+            y = libtcod.random_get_int(0, room.y1+1, room.y2-1)
+            blocked=is_blocked(x,y)
+            self.target_x=y
+            self.target_y=x
+        self.recalculate()
+
+    def recalculate(self):
+        monster = self.owner
+        self.success=libtcod.path_compute(self.path, monster.x, monster.y, self.target_x, self.target_y)
+
+
+    def take_turn(self):
+        monster = self.owner
+        try:
+            if self.path==None:
+                self.path = libtcod.path_new_using_map(copy.deepcopy(path_map))
+        except:
+            self.path = libtcod.path_new_using_map(copy.deepcopy(path_map))
+
+        try:
+            if self.target_x is None or self.target_y is None:
+                self.randomize_target()
+        except:
+            self.randomize_target()
+
+        stepx,stepy=0,0
+        moved=False
+        if monster.distance_to(Point(self.target_x,self.target_y)) >= 2 and self.success:
+            stepx,stepy=libtcod.path_walk(self.path,False)
+            moved=monster.move(stepx-monster.x,stepy-monster.y)
+
+        if not moved:
+            if stepx!=0 and stepy!=0:
+                blocking=get_object(stepx,stepy)
+                if blocking is not None and hasattr(blocking,"fighter"):
+                    self.recalculate()
+                    if blocking.fighter.hp > 0 and monster.distance_to(blocking) < 2:
+                        monster.fighter.attack(blocking)
+                else:
+                    self.randomize_target()
+            else:
+                self.randomize_target()
 
 class Item:
     #an item that can be picked up and used.
@@ -452,7 +501,7 @@ def player_death(player):
 def monster_death(monster):
     #transform it into a nasty corpse! it doesn't block, can't be
     #attacked and doesn't move
-    message(monster.name.capitalize() + ' kukistui!',libtcod.green)
+    message(monster.name.capitalize() + ' kukistui!',libtcod.green,monster.x,monster.y)
     monster.char = '%'
     monster.color = libtcod.dark_red
     monster.blocks = False
@@ -461,7 +510,7 @@ def monster_death(monster):
     monster.name = monster.name + "n ruumis"
     monster.send_to_back()
 
-spells={}
+
 def spell_heal(caster,parent,arguments=[10]):
     #heal the player
     if caster.fighter.hp == caster.fighter.max_hp:
@@ -481,24 +530,58 @@ def spell_explode(caster,parent,arguments):
     message('KAPYYM!!!!!!! '+parent.owner.name+' posahti!', libtcod.red)
     caster.fighter.take_damage(60-(caster.fighter.defense*2))
 
-objects_list={
-    "Morko": Object(0, 0, "M", "Morko", libtcod.green,blocks=True, fighter=Fighter(hp=10, defense=0, power=5, xp=50, death_function=monster_death), ai=BasicMonster()),
-    "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, defense=10, power=10, xp=100, death_function=monster_death), ai=BasicMonster()),
-    "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, defense=10, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
+def arkku_interact(object):
+    message("Avaat arkun",libtcod.green)
+    loot=[]
+    possible=["Taikajuoma","Miekka","Kilpi","Kakku","Impostor_kakku"]
+    morkoarkku=False
+    if libtcod.random_get_int(0,1,30)==1:
+        morkoarkku=True
+    for ox in range(-1,2):
+        for oy in range(-1,2):
+            if morkoarkku and is_blocked(object.x+ox,object.y+oy)==None:
+                thing=new_object("Morko")
+                thing.x=object.x+ox
+                thing.y=object.y+oy
+                objects.append(thing)
+            elif libtcod.random_get_int(0,1,6)==1 and is_blocked(object.x+ox,object.y+oy)==None:
+                choice=random.choice(possible)
+                thing=new_object(choice)
+                thing.x=object.x+ox
+                thing.y=object.y+oy
+                objects.append(thing)
+                loot.append(thing.name)
+    objects.remove(object)
+    objects.append(Object(object.x, object.y, "=", "Tyhjä arkku", libtcod.gray, blocks=False))
+    if morkoarkku:
+        message("Arkusta hyppää esiin mörköarmeija!",libtcod.red)
+    elif len(loot)>0:
+        message("Arkusta löytyy "+", ".join(loot))
+    else:
+        message("Arkku on tyhjä!")
 
-    "Taikajuoma": Object(0, 0, "!", "Taikajuoma", libtcod.purple,blocks=False, item = Item(use_function=spell_heal,use_arguments=[10])),
-    "Puukko": Object(0, 0, "/", "Puukko", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=2)),
-    "Miekka": Object(0, 0, "/", "Miekka", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=5)),
-    "Kilpi": Object(0, 0, "[", "Kilpi", libtcod.white, blocks=False, equipment=Equipment("vasen nyrkki", defense_bonus=5)),
-    "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, item=Item(use_function=spell_eat,use_arguments=[20])),
-    "Impostor_kakku": Object(0, 0, "%", "Kakku", libtcod.gray, blocks=False, item=Item(use_function=spell_explode)),
+def new_object(what):
+    objects_list={
+        "Morko": Object(0, 0, "M", "Morko", libtcod.green,blocks=True, fighter=Fighter(hp=10, defense=0, power=5, xp=50, death_function=monster_death), ai=BasicMonster()),
+        "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, defense=10, power=10, xp=100, death_function=monster_death), ai=BasicMonster()),
+        "Kaareni": Object(0, 0, "C", "Kaareni", libtcod.gray,blocks=True, fighter=Fighter(hp=20, defense=0, power=20, xp=100, death_function=monster_death), ai=Wandering()),
+        "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, defense=10, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
 
-}
+        "Taikajuoma": Object(0, 0, "!", "Taikajuoma", libtcod.purple,blocks=False, item = Item(use_function=spell_heal,use_arguments=[10])),
+        "Puukko": Object(0, 0, "/", "Puukko", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=2)),
+        "Miekka": Object(0, 0, "/", "Miekka", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=5)),
+        "Kilpi": Object(0, 0, "[", "Kilpi", libtcod.white, blocks=False, equipment=Equipment("vasen nyrkki", defense_bonus=5)),
+        "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, item=Item(use_function=spell_eat,use_arguments=[20])),
+        "Impostor_kakku": Object(0, 0, "%", "Kakku", libtcod.gray, blocks=False, item=Item(use_function=spell_explode)),
+        "Arkku": Object(0, 0, "=", "Arkku", libtcod.yellow, blocks=False, actions={"interact":arkku_interact}),
+    }
+    return objects_list[what]
+
 spawn={
-    1: {"monsters":2,"monster":{"Morko":99,"Kyrssi":1},"items":1,"item":{"Taikajuoma":90,"Kakku":10}},
-    3: {"monsters":3,"monster":{"Morko":99,"Kyrssi":1},"items":3,"item":{"Puukko":20,"Taikajuoma":80}},
-    5: {"monsters":4,"monster":{"Morko":90,"Kyrssi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10,"Taikajuoma":50,"Miekka":20,"Kakku":10,"Impostor_kakku":10}},
-    9: {"monsters":3,"monster":{"Morko":80,"Kyrssi":18,"Tomuttaja":2},"items":1,"item":{"Kilpi":1,"Taikajuoma":88,"Miekka":1,"Impostor_kakku":10}},
+    1: {"monsters":2,"monster":{"Morko":99,"Kyrssi":1},"items":1,"item":{"Arkku":90,"Kakku":10},"-rooms":1,"+rooms":6},
+    3: {"monsters":4,"monster":{"Morko":69,"Kyrssi":1,"Kaareni":30},"items":3,"item":{"Puukko":30,"Taikajuoma":60,"Arkku":10},"-rooms":3,"+rooms":6},
+    5: {"monsters":4,"monster":{"Morko":90,"Kyrssi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10,"Taikajuoma":50,"Miekka":20,"Kakku":10,"Impostor_kakku":10},"-rooms":1,"+rooms":8},
+    9: {"monsters":3,"monster":{"Morko":60,"Kyrssi":18,"Tomuttaja":2,"Kaareni":20},"items":1,"item":{"Kilpi":1,"Taikajuoma":68,"Miekka":1,"Impostor_kakku":5,"Kakku":10,"Arkku":15},"-rooms":5,"+rooms":12},
 }
 
 def from_dungeon_level(table):
@@ -617,7 +700,7 @@ def place_objects(room):
         y = libtcod.random_get_int(0, room.y1+1, room.y2-1)
         if is_blocked(x, y)==None:
             choice=random_choice(monster_chances)
-            monster=copy.deepcopy(objects_list[choice])
+            monster=new_object(choice)
             monster.x=x
             monster.y=y
             objects.append(monster)
@@ -630,7 +713,7 @@ def place_objects(room):
         #only place it if the tile is not blocked
         if is_blocked(x, y)==None:
             choice=random_choice(item_chances)
-            item=copy.deepcopy(objects_list[choice])
+            item=new_object(choice)
             item.x=x
             item.y=y
             objects.append(item)
@@ -661,7 +744,7 @@ def next_level():
     initialize_fov()
 
 def make_map():
-    global map, objects, stairs, path_map
+    global map, objects, stairs, path_map, rooms
 
     #the list of objects with just the player
     objects = [player]
@@ -674,8 +757,15 @@ def make_map():
 
     rooms = []
     num_rooms = 0
-    min_rooms=from_dungeon_level([[2, 1],[4, 3], [10, 5], [10, 7], [30, 9]])
-    max_rooms=from_dungeon_level([[10, 1],[10, 3], [30, 5], [50, 7], [40, 9]])
+    level=dungeon_level
+    error=True
+    while error:
+        try:
+            min_rooms = spawn[level]["-rooms"]
+            max_rooms = spawn[level]["+rooms"]
+            error=False
+        except KeyError:
+            level-=1
 
     for r in range(libtcod.random_get_int(0,min_rooms,max_rooms)):
         #random width and height
@@ -940,10 +1030,15 @@ def handle_keys():
                 #pick up an item
                 upped=False
                 for object in objects:  #look for an item in the player's tile
-                    if object.x == player.x and object.y == player.y and object.item:
-                        object.item.pick_up()
-                        upped=True
-                        break
+                    if object.x == player.x and object.y == player.y:
+                        if object.item:
+                            object.item.pick_up()
+                            upped=True
+                            break
+                        if "interact" in object.actions:
+                            object.actions["interact"](object)
+                            upped=True
+                            break
                 if not upped:
                     message('Maassa ei ole otettavaa.',libtcod.dark_red)
                     return 'didnt-take-turn'
@@ -975,28 +1070,28 @@ def handle_keys():
             message('Osut muuriin.',libtcod.dark_red)
             return 'didnt-take-turn'
 
-def message(new_msg, color = libtcod.white):
+def message(new_msg, color = libtcod.white,x=None,y=None):
     #split the message if necessary, among multiple lines
-    new_msg_lines = textwrap.wrap(new_msg, MSG_WIDTH)
+    if x==None or libtcod.map_is_in_fov(fov_map, x, y):
+        new_msg_lines = textwrap.wrap(new_msg, MSG_WIDTH)
 
-    for line in new_msg_lines:
-        #if the buffer is full, remove the first line to make room for the new one
-        if len(game_msgs) == MSG_HEIGHT:
-            del game_msgs[0]
+        for line in new_msg_lines:
+            #if the buffer is full, remove the first line to make room for the new one
+            if len(game_msgs) == MSG_HEIGHT:
+                del game_msgs[0]
 
-        #add the new line as a tuple, with the text and the color
-        game_msgs.append( (line, color) )
-        y = 1
-        libtcod.console_set_default_background(panel, libtcod.black)
-        libtcod.console_clear(panel)
-        render_all()
-        for (line, color) in game_msgs:
-            libtcod.console_set_default_foreground(panel, color)
-            libtcod.console_print_ex(panel, MSG_X, y, libtcod.BKGND_NONE, libtcod.LEFT, line)
-            y += 1
-        libtcod.console_blit(panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, PANEL_Y)
-        libtcod.console_flush()
-        time.sleep(0.2)
+            #add the new line as a tuple, with the text and the color
+            game_msgs.append( (line, color) )
+            y = 1
+            libtcod.console_set_default_background(panel, libtcod.black)
+            libtcod.console_clear(panel)
+            render_all()
+            for (line, color) in game_msgs:
+                libtcod.console_set_default_foreground(panel, color)
+                libtcod.console_print_ex(panel, MSG_X, y, libtcod.BKGND_NONE, libtcod.LEFT, line)
+                y += 1
+            libtcod.console_blit(panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, PANEL_Y)
+            libtcod.console_flush()
 
 def msgbox(text, width=50):
     menu(text, [], width)  #use menu() as a sort of "message box"
