@@ -150,8 +150,11 @@ class Point:
 
 class Tile:
     #a tile of the map and its properties
-    def __init__(self, blocked, block_sight = None):
+    def __init__(self, blocked, block_sight = None,char=" ",color=libtcod.gray,bgcolor=color_light_ground):
         self.blocked = blocked
+        self.char=char
+        self.color=color
+        self.bgcolor=bgcolor
 
         #all tiles start unexplored
         self.explored = False
@@ -277,7 +280,7 @@ class Fighter:
         self.base_defense = defense
         self.base_power = power
         self.fight_messages=fight_messages
-    def take_damage(self, damage):
+    def take_damage(self, damage,attacker=None):
         #apply damage if possible
         if damage > 0:
             self.hp -= damage
@@ -287,8 +290,8 @@ class Fighter:
                 if function is not None:
                     function(self.owner)
                     playsound('assets/sounds/death.wav')
-                if self.owner != player:  #yield experience to the player
-                    player.fighter.xp += self.xp
+                if attacker is not None:
+                    attacker.xp += self.xp
     def attack(self, target):
         #a simple formula for attack damage
         damage = self.power - target.fighter.defense
@@ -301,7 +304,7 @@ class Fighter:
         if damage > 0:
             #make the target take some damage
             message(random.choice(self.fight_messages).replace("@1",self.owner.name).replace("@2",target.name), colorr[0],self.owner.x,self.owner.y)
-            target.fighter.take_damage(damage)
+            target.fighter.take_damage(damage,self)
         else:
             message(random.choice(self.fight_messages).replace("@1",self.owner.name).replace("@2",target.name) + ', ilman vaikutusta!', colorr[1],self.owner.x,self.owner.y)
 
@@ -323,6 +326,20 @@ class Fighter:
     def max_hp(self):  #return actual max_hp, by summing up the bonuses from all equipped items
         bonus = sum(equipment.max_hp_bonus for equipment in get_all_equipped(self.owner))
         return self.base_max_hp + bonus
+
+class NoobMonster:
+    #AI for a basic monster.
+    def take_turn(self):
+        monster=self.owner
+        move=True
+        for object in objects:
+            if object!=monster and hasattr(object,"fighter") and object.fighter is not None and monster.distance_to(object) < 2 and object.fighter.hp>0:
+                monster.fighter.attack(object)
+                move=False
+        if move:
+            sx=random.randint(-1,1)
+            sy=random.randint(-1,1)
+            monster.move(sx,sy)
 
 class BasicMonster:
     #AI for a basic monster.
@@ -349,11 +366,13 @@ class AdvancedMonster:
         success=libtcod.path_compute(self.path, monster.x, monster.y, player.x, player.y)
         stepx,stepy=libtcod.path_walk(self.path,True)
         #move towards player if far away
+        moved=False
         if monster.distance_to(player) >= 2 and success:
-            monster.move(stepx-monster.x,stepy-monster.y)
+            moved=monster.move(stepx-monster.x,stepy-monster.y)
         #close enough, attack! (if the player is still alive.)
-        elif player.fighter.hp > 0 and monster.distance_to(player) < 2:
-            monster.fighter.attack(player)
+        for object in objects:
+            if object!=monster and hasattr(object,"fighter") and object.fighter is not None and monster.distance_to(object) < 2 and object.fighter.hp>0 and not (object==player and moved):
+                monster.fighter.attack(object)
 
 class Wandering:
     def __init__(self):
@@ -361,7 +380,6 @@ class Wandering:
     def randomize_target(self):
         blocked=True
         room = random.choice(rooms)
-        print(rooms.index(room))
         while blocked is not None:
             x = libtcod.random_get_int(0, room.x1+1, room.x2-1)
             y = libtcod.random_get_int(0, room.y1+1, room.y2-1)
@@ -398,7 +416,7 @@ class Wandering:
         if not moved:
             if stepx!=0 and stepy!=0:
                 blocking=get_object(stepx,stepy)
-                if blocking is not None and hasattr(blocking,"fighter"):
+                if blocking is not None and hasattr(blocking,"fighter") and blocking.fighter is not None:
                     self.recalculate()
                     if blocking.fighter.hp > 0 and monster.distance_to(blocking) < 2:
                         monster.fighter.attack(blocking)
@@ -562,10 +580,11 @@ def arkku_interact(object):
 
 def new_object(what):
     objects_list={
-        "Morko": Object(0, 0, "M", "Morko", libtcod.green,blocks=True, fighter=Fighter(hp=10, defense=0, power=5, xp=50, death_function=monster_death), ai=BasicMonster()),
-        "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, defense=10, power=10, xp=100, death_function=monster_death), ai=BasicMonster()),
-        "Kaareni": Object(0, 0, "C", "Kaareni", libtcod.gray,blocks=True, fighter=Fighter(hp=20, defense=0, power=20, xp=100, death_function=monster_death), ai=Wandering()),
-        "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, defense=10, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
+        "Sompi": Object(0, 0, "S", "Sompi", libtcod.light_green,blocks=True, fighter=Fighter(hp=7, defense=0, power=10, xp=40, death_function=monster_death), ai=NoobMonster()),
+        "Morko": Object(0, 0, "M", "Morko", libtcod.green,blocks=True, fighter=Fighter(hp=12, defense=0, power=5, xp=80, death_function=monster_death), ai=BasicMonster()),
+        "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, defense=10, power=10, xp=200, death_function=monster_death), ai=BasicMonster()),
+        "Kaareni": Object(0, 0, "C", "Kaareni", libtcod.gray,blocks=True, fighter=Fighter(hp=20, defense=0, power=20, xp=60, death_function=monster_death), ai=Wandering()),
+        "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, defense=5, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
 
         "Taikajuoma": Object(0, 0, "!", "Taikajuoma", libtcod.purple,blocks=False, item = Item(use_function=spell_heal,use_arguments=[10])),
         "Puukko": Object(0, 0, "/", "Puukko", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=2)),
@@ -578,10 +597,10 @@ def new_object(what):
     return objects_list[what]
 
 spawn={
-    1: {"monsters":2,"monster":{"Morko":99,"Kyrssi":1},"items":1,"item":{"Arkku":90,"Kakku":10},"-rooms":1,"+rooms":6},
-    3: {"monsters":4,"monster":{"Morko":69,"Kyrssi":1,"Kaareni":30},"items":3,"item":{"Puukko":30,"Taikajuoma":60,"Arkku":10},"-rooms":3,"+rooms":6},
-    5: {"monsters":4,"monster":{"Morko":90,"Kyrssi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10,"Taikajuoma":50,"Miekka":20,"Kakku":10,"Impostor_kakku":10},"-rooms":1,"+rooms":8},
-    9: {"monsters":3,"monster":{"Morko":60,"Kyrssi":18,"Tomuttaja":2,"Kaareni":20},"items":1,"item":{"Kilpi":1,"Taikajuoma":68,"Miekka":1,"Impostor_kakku":5,"Kakku":10,"Arkku":15},"-rooms":5,"+rooms":12},
+    1: {"monsters":2,"monster":{"Sompi":99,"Morko":1},"items":1,"item":{"Arkku":90,"Kakku":10},"-rooms":1,"+rooms":6},
+    4: {"monsters":4,"monster":{"Sompi":59,"Morko":11,"Kaareni":30},"items":3,"item":{"Puukko":30,"Taikajuoma":60,"Arkku":10},"-rooms":3,"+rooms":6},
+    7: {"monsters":4,"monster":{"Morko":90,"Sompi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10,"Taikajuoma":50,"Miekka":20,"Kakku":10,"Impostor_kakku":10},"-rooms":1,"+rooms":8},
+    11: {"monsters":3,"monster":{"Morko":60,"Kyrssi":18,"Tomuttaja":2,"Kaareni":20},"items":1,"item":{"Kilpi":1,"Taikajuoma":68,"Miekka":1,"Impostor_kakku":5,"Kakku":10,"Arkku":15},"-rooms":5,"+rooms":12},
 }
 
 def from_dungeon_level(table):
@@ -630,6 +649,8 @@ def get_names(x,y):
          return None
 
 def is_blocked(x, y):
+    if x<1 or x>MAP_WIDTH-1 or y<1 or y>MAP_HEIGHT-1:
+        return True
     #first test the map tile
     if map[x][y].blocked:
         return True
@@ -651,10 +672,29 @@ def get_object(x, y):
 def create_room(room):
     global map
     #go through the tiles in the rectangle and make them passable
-    for x in range(room.x1 + 1, room.x2):
-        for y in range(room.y1 + 1, room.y2):
-            map[x][y].blocked = False
-            map[x][y].block_sight = False
+    for x in range(room.x1-1, room.x2+2):
+        for y in range(room.y1-1, room.y2+2):
+            if x==room.x1-1 or x==room.x2+1 or y==room.y1-1 or y==room.y2+1:
+                if map[x][y].blocked:
+                    map[x][y]=Tile(True, char="#",color=libtcod.gray,bgcolor=color_light_wall)
+            else:
+                map[x][y]=Tile(False, char=".",color=libtcod.gray,bgcolor=color_light_ground)
+
+def randomwalk(tiles):
+    count=0
+    where=random.choice(rooms).center()
+    x=random.randint(3,MAP_WIDTH-3)
+    y=random.randint(3,MAP_HEIGHT-3)
+    while count<tiles:
+        if map[x][y].blocked or random.randint(0,4)==4:
+            count+=1
+            map[x][y]=Tile(False, char="'",color=libtcod.gray,bgcolor=color_light_ground)
+        sx=0
+        sy=0
+        while (x+sx<2 or x+sx>MAP_WIDTH-2 or y+sy<2 or y+sy>MAP_HEIGHT-2 or (sx==0 and sy==0)):
+            sx=random.randint(-1,1)
+            sy=random.randint(-1,1)
+        x,y=x+sx,y+sy
 
 def random_choice_index(chances):  #choose one option from list of chances, returning its index
     #the dice will land on some number between 1 and the sum of the chances
@@ -722,15 +762,15 @@ def create_h_tunnel(x1, x2, y):
     global map
     #horizontal tunnel. min() and max() are used in case x1>x2
     for x in range(min(x1, x2), max(x1, x2) + 1):
-        map[x][y].blocked = False
-        map[x][y].block_sight = False
+        map[x][y]=Tile(False, char=".",color=libtcod.gray,bgcolor=color_light_ground)
+
 
 def create_v_tunnel(y1, y2, x):
     global map
     #vertical tunnel
     for y in range(min(y1, y2), max(y1, y2) + 1):
-        map[x][y].blocked = False
-        map[x][y].block_sight = False
+        map[x][y]=Tile(False, char=".",color=libtcod.gray,bgcolor=color_light_ground)
+
 
 def next_level():
     global dungeon_level
@@ -751,7 +791,7 @@ def make_map():
     (prev_x, prev_y) = (0, 0)
 
     #fill map with "blocked" tiles
-    map = [[ Tile(True)
+    map = [[Tile(True, char="+",color=libtcod.gray,bgcolor=color_light_wall)
         for y in range(MAP_HEIGHT) ]
             for x in range(MAP_WIDTH) ]
 
@@ -819,6 +859,8 @@ def make_map():
             place_objects(new_room)
             rooms.append(new_room)
             num_rooms += 1
+    if random.randint(0,10)<1:
+        randomwalk(random.randint(50,500))
     #create stairs at the center of the last room
     stairs = Object(new_x, new_y, '<', 'portaat', libtcod.white)
     objects.append(stairs)
@@ -918,6 +960,7 @@ def render_all():
         #go through all tiles, and set their background color according to the FOV
         for y in range(MAP_HEIGHT):
             for x in range(MAP_WIDTH):
+                cell = map[x][y]
                 visible = libtcod.map_is_in_fov(fov_map, x, y)
                 wall = map[x][y].block_sight
                 if not visible:
@@ -929,10 +972,7 @@ def render_all():
                             libtcod.console_put_char_ex(con, x, y, ' ', libtcod.gray, color_dark_ground)
                 else:
                     #it's visible
-                    if wall:
-                        libtcod.console_put_char_ex(con, x, y, '#', libtcod.gray, color_light_wall)
-                    else:
-                        libtcod.console_put_char_ex(con, x, y, '.', libtcod.gray, color_light_ground)
+                    libtcod.console_put_char_ex(con, x, y, cell.char, cell.color, cell.bgcolor)
                     #since it's visible, explore it
                     map[x][y].explored = True
 
