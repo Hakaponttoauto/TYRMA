@@ -342,34 +342,45 @@ class NoobMonster:
             monster.move(sx,sy)
 
 class BasicMonster:
+    def __init__(self,period=1):
+        self.period=period
+        self.tick=0
     #AI for a basic monster.
     def take_turn(self):
-        #a basic monster takes its turn. If you can see it, it can see you
-        monster = self.owner
-        if libtcod.map_is_in_fov(fov_map, monster.x, monster.y):
-
-            #move towards player if far away
-            if monster.distance_to(player) >= 2:
-                monster.move_towards(player.x, player.y)
-
-            #close enough, attack! (if the player is still alive.)
-            elif player.fighter.hp > 0:
-                monster.fighter.attack(player)
-class AdvancedMonster:
-    def take_turn(self):
-        monster = self.owner
-        try:
-            if self.path==None:
-                self.path = libtcod.path_new_using_map(path_map)
-        except:
-            self.path = libtcod.path_new_using_map(path_map)
-        success=libtcod.path_compute(self.path, monster.x, monster.y, player.x, player.y)
-        stepx,stepy=libtcod.path_walk(self.path,True)
-        #move towards player if far away
+        self.tick+=1
         moved=False
-        if monster.distance_to(player) >= 2 and success:
-            moved=monster.move(stepx-monster.x,stepy-monster.y)
-        #close enough, attack! (if the player is still alive.)
+        monster = self.owner
+        if self.tick%self.period==0:
+            #a basic monster takes its turn. If you can see it, it can see you
+            if libtcod.map_is_in_fov(fov_map, monster.x, monster.y):
+
+                #move towards player if far away
+                if monster.distance_to(player) >= 2:
+                    moved=monster.move_towards(player.x, player.y)
+
+                #close enough, attack! (if the player is still alive.)
+        if not moved and player.fighter.hp > 0 and monster.distance_to(player) < 2:
+            monster.fighter.attack(player)
+class AdvancedMonster:
+    def __init__(self,period=1):
+        self.period=period
+        self.tick=0
+    def take_turn(self):
+        self.tick+=1
+        moved=False
+        monster = self.owner
+        if self.tick%self.period==0:
+            try:
+                if self.path==None:
+                    self.path = libtcod.path_new_using_map(path_map)
+            except:
+                self.path = libtcod.path_new_using_map(path_map)
+            success=libtcod.path_compute(self.path, monster.x, monster.y, player.x, player.y)
+            stepx,stepy=libtcod.path_walk(self.path,True)
+            #move towards player if far away
+            if monster.distance_to(player) >= 2 and success:
+                moved=monster.move(stepx-monster.x,stepy-monster.y)
+            #close enough, attack! (if the player is still alive.)
         for object in objects:
             if object!=monster and hasattr(object,"fighter") and object.fighter is not None and monster.distance_to(object) < 2 and object.fighter.hp>0 and not (object==player and moved):
                 monster.fighter.attack(object)
@@ -583,7 +594,7 @@ def new_object(what):
     objects_list={
         "Sompi": Object(0, 0, "S", "Sompi", libtcod.light_green,blocks=True, fighter=Fighter(hp=7, defense=0, power=10, xp=40, death_function=monster_death), ai=NoobMonster()),
         "Morko": Object(0, 0, "M", "Morko", libtcod.green,blocks=True, fighter=Fighter(hp=12, defense=0, power=5, xp=80, death_function=monster_death), ai=BasicMonster()),
-        "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, defense=10, power=10, xp=200, death_function=monster_death), ai=BasicMonster()),
+        "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, defense=10, power=10, xp=200, death_function=monster_death), ai=BasicMonster(2)),
         "Kaareni": Object(0, 0, "C", "Kaareni", libtcod.gray,blocks=True, fighter=Fighter(hp=20, defense=0, power=20, xp=60, death_function=monster_death), ai=Wandering()),
         "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, defense=5, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
 
@@ -675,8 +686,8 @@ def get_object(x, y):
 def create_room(room):
     global map
     #go through the tiles in the rectangle and make them passable
-    for x in range(room.x1, room.x2):
-        for y in range(room.y1, room.y2):
+    for x in range(room.x1, room.x2+1):
+        for y in range(room.y1, room.y2+1):
             if x==room.x1 or x==room.x2 or y==room.y1 or y==room.y2:
                 if map[x][y].blocked:
                     map[x][y]=Tile(True, char="#",color=libtcod.gray,bgcolor=color_light_wall)
