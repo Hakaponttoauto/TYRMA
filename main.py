@@ -578,6 +578,7 @@ def arkku_interact(object):
     else:
         message("Arkku on tyhjä!")
 
+#defines objects/monsters
 def new_object(what):
     objects_list={
         "Sompi": Object(0, 0, "S", "Sompi", libtcod.light_green,blocks=True, fighter=Fighter(hp=7, defense=0, power=10, xp=40, death_function=monster_death), ai=NoobMonster()),
@@ -589,19 +590,21 @@ def new_object(what):
         "Taikajuoma": Object(0, 0, "!", "Taikajuoma", libtcod.purple,blocks=False, item = Item(use_function=spell_heal,use_arguments=[10])),
         "Puukko": Object(0, 0, "/", "Puukko", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=2)),
         "Miekka": Object(0, 0, "/", "Miekka", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=5)),
+        "Sauva": Object(0, 0, "/", "Sauva", libtcod.white, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=15)),
         "Kilpi": Object(0, 0, "[", "Kilpi", libtcod.white, blocks=False, equipment=Equipment("vasen nyrkki", defense_bonus=5)),
         "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, item=Item(use_function=spell_eat,use_arguments=[20])),
         "Impostor_kakku": Object(0, 0, "%", "Kakku", libtcod.gray, blocks=False, item=Item(use_function=spell_explode)),
         "Arkku": Object(0, 0, "=", "Arkku", libtcod.yellow, blocks=False, actions={"interact":arkku_interact}),
     }
     return objects_list[what]
-
+#defines objects/monsters spawnrate
 spawn={
     1: {"monsters":2,"monster":{"Sompi":99,"Morko":1},"items":1,"item":{"Arkku":90,"Kakku":10},"-rooms":1,"+rooms":6},
     4: {"monsters":4,"monster":{"Sompi":59,"Morko":11,"Kaareni":30},"items":3,"item":{"Puukko":30,"Taikajuoma":60,"Arkku":10},"-rooms":3,"+rooms":6},
-    7: {"monsters":4,"monster":{"Morko":90,"Sompi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10,"Taikajuoma":50,"Miekka":20,"Kakku":10,"Impostor_kakku":10},"-rooms":1,"+rooms":8},
-    11: {"monsters":3,"monster":{"Morko":60,"Kyrssi":18,"Tomuttaja":2,"Kaareni":20},"items":1,"item":{"Kilpi":1,"Taikajuoma":68,"Miekka":1,"Impostor_kakku":5,"Kakku":10,"Arkku":15},"-rooms":5,"+rooms":12},
+    7: {"monsters":4,"monster":{"Morko":90,"Sompi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10, "Taikajuoma":50,"Miekka":20,"Kakku":10,"Impostor_kakku":10,"Sauva": 5},"-rooms":1, "+rooms":8},
+    11: {"monsters":3,"monster":{"Morko":60,"Kyrssi":18,"Tomuttaja":2,"Kaareni":20},"items":1,"item":{"Kilpi":1,"Taikajuoma":68,"Miekka":1,"Impostor_kakku":5,"Kakku":10,"Arkku":15,"Sauva":5},"-rooms":5, "+rooms":12},
 }
+
 
 def from_dungeon_level(table):
     #returns a value that depends on level. the table specifies what value occurs after each level, default is 0.
