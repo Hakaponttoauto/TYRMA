@@ -672,9 +672,9 @@ def get_object(x, y):
 def create_room(room):
     global map
     #go through the tiles in the rectangle and make them passable
-    for x in range(room.x1-1, room.x2+2):
-        for y in range(room.y1-1, room.y2+2):
-            if x==room.x1-1 or x==room.x2+1 or y==room.y1-1 or y==room.y2+1:
+    for x in range(room.x1, room.x2):
+        for y in range(room.y1, room.y2):
+            if x==room.x1 or x==room.x2 or y==room.y1 or y==room.y2:
                 if map[x][y].blocked:
                     map[x][y]=Tile(True, char="#",color=libtcod.gray,bgcolor=color_light_wall)
             else:
