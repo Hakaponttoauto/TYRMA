@@ -601,7 +601,7 @@ def new_object(what):
     objects_list={
         "Sompi": Object(0, 0, "S", "Sompi", libtcod.light_green,blocks=True, fighter=Fighter(hp=7, hunger=1000, defense=0, power=10, xp=40, death_function=monster_death), ai=NoobMonster()),
         "Morko": Object(0, 0, "M", "Morko", libtcod.green,blocks=True, fighter=Fighter(hp=12, hunger=1000, defense=0, power=5, xp=80, death_function=monster_death), ai=BasicMonster()),
-        "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, hunger=1000, defense=10, power=10, xp=200, death_function=monster_death), ai=BasicMonster(a)),
+        "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, hunger=1000, defense=10, power=10, xp=200, death_function=monster_death), ai=BasicMonster(2)),
         "Kaareni": Object(0, 0, "C", "Kaareni", libtcod.gray,blocks=True, fighter=Fighter(hp=20, hunger=1000, defense=0, power=20, xp=60, death_function=monster_death), ai=Wandering()),
         "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, hunger=1000, defense=5, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
 
