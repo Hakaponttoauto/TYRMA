@@ -56,7 +56,7 @@ def new_game():
 
     name="Seikkailija"
         #create object representing the player
-    fighter_component = Fighter(hp=30, defense=2, power=5, xp=0, death_function=player_death)
+    fighter_component = Fighter(hp=30, hunger=20, defense=2, power=5, xp=0, death_function=player_death)
     player = Object(0, 0, '@', name, libtcod.white, blocks=True, fighter=fighter_component, player=True)
 
     player.level = 1
@@ -142,6 +142,7 @@ def check_level_up():
         elif choice == 2:
             player.fighter.base_defense += 1
             message('Puolustuksesi kasvaa!', libtcod.yellow)
+
 
 class Point:
     def __init__(self,x,y):
@@ -229,7 +230,6 @@ class Object:
             if blocking!=True and "bump" in blocking.actions:
                 blocking.actions["bump"](self)
             return False
-
     def draw(self):
         #only show if it's visible to the player
         if libtcod.map_is_in_fov(fov_map, self.x, self.y):
@@ -269,18 +269,21 @@ class Object:
         global objects
         objects.remove(self)
         objects.append(self)
-
 class Fighter:
     #combat-related properties and methods (monster, player, NPC).
-    def __init__(self, hp, defense, power, xp, death_function=None, fight_messages=["@1 kamppailee @2a vastaan"]):
+    def __init__(self, hp, hunger, defense, power, xp, death_function=None, fight_messages=["@1 kamppailee @2a vastaan"]):
         self.xp = xp
         self.death_function = death_function
         self.base_max_hp = hp
         self.hp = hp
+        self.base_max_hunger = hunger
+        self.hunger = hunger
         self.base_defense = defense
         self.base_power = power
         self.fight_messages=fight_messages
     def take_damage(self, damage,attacker=None):
+        if self.hunger > 0:
+            self.hunger -= 2
         #apply damage if possible
         if damage > 0:
             self.hp -= damage
@@ -313,6 +316,11 @@ class Fighter:
         self.hp += amount
         if self.hp > self.max_hp:
             self.hp = self.max_hp
+    def feed(self, amount):
+        #feed by the given amount, without going over the maximum
+        self.hunger += amount
+        if self.hunger > self.base_max_hunger:
+            self.hunger = self.base_max_hunger
     @property
     def power(self):
         bonus = sum(equipment.power_bonus for equipment in get_all_equipped(self.owner))
@@ -321,7 +329,6 @@ class Fighter:
     def defense(self):  #return actual defense, by summing up the bonuses from all equipped items
         bonus = sum(equipment.defense_bonus for equipment in get_all_equipped(self.owner))
         return self.base_defense + bonus
-
     @property
     def max_hp(self):  #return actual max_hp, by summing up the bonuses from all equipped items
         bonus = sum(equipment.max_hp_bonus for equipment in get_all_equipped(self.owner))
@@ -549,11 +556,11 @@ def spell_heal(caster,parent,arguments=[10]):
     caster.fighter.heal(arguments[0])
 
 def spell_eat(caster,parent,arguments=[10]):
-    if caster.fighter.hp == caster.fighter.max_hp:
+    if caster.fighter.hunger == caster.fighter.base_max_hunger:
         message('Vatsasi on jo pullollaan.', libtcod.sepia)
         return 'cancelled'
     message('Ahdat '+parent.owner.name+'a naamaasi, namskis maiskis lurpsis!', libtcod.green)
-    caster.fighter.heal(arguments[0])
+    caster.fighter.feed(arguments[0])
 
 def spell_explode(caster,parent,arguments):
     message('KAPYYM!!!!!!! '+parent.owner.name+' posahti!', libtcod.red)
@@ -562,7 +569,7 @@ def spell_explode(caster,parent,arguments):
 def arkku_interact(object):
     message("Avaat arkun",libtcod.green)
     loot=[]
-    possible=["Taikajuoma","Miekka","Kilpi","Kakku","Impostor_kakku"]
+    possible=["Taikajuoma","Miekka", "Kilpi","Kakku", "Mokkapala", "Impostor_kakku"]
     morkoarkku=False
     if libtcod.random_get_int(0,1,30)==1:
         morkoarkku=True
@@ -592,11 +599,11 @@ def arkku_interact(object):
 #defines objects/monsters
 def new_object(what):
     objects_list={
-        "Sompi": Object(0, 0, "S", "Sompi", libtcod.light_green,blocks=True, fighter=Fighter(hp=7, defense=0, power=10, xp=40, death_function=monster_death), ai=NoobMonster()),
-        "Morko": Object(0, 0, "M", "Morko", libtcod.green,blocks=True, fighter=Fighter(hp=12, defense=0, power=5, xp=80, death_function=monster_death), ai=BasicMonster()),
-        "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, defense=10, power=10, xp=200, death_function=monster_death), ai=BasicMonster(2)),
-        "Kaareni": Object(0, 0, "C", "Kaareni", libtcod.gray,blocks=True, fighter=Fighter(hp=20, defense=0, power=20, xp=60, death_function=monster_death), ai=Wandering()),
-        "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, defense=5, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
+        "Sompi": Object(0, 0, "S", "Sompi", libtcod.light_green,blocks=True, fighter=Fighter(hp=7, hunger=1000, defense=0, power=10, xp=40, death_function=monster_death), ai=NoobMonster()),
+        "Morko": Object(0, 0, "M", "Morko", libtcod.green,blocks=True, fighter=Fighter(hp=12, hunger=1000, defense=0, power=5, xp=80, death_function=monster_death), ai=BasicMonster()),
+        "Kyrssi": Object(0, 0, "K", "Kyrssi", libtcod.green,blocks=True, fighter=Fighter(hp=30, hunger=1000, defense=10, power=10, xp=200, death_function=monster_death), ai=BasicMonster(a)),
+        "Kaareni": Object(0, 0, "C", "Kaareni", libtcod.gray,blocks=True, fighter=Fighter(hp=20, hunger=1000, defense=0, power=20, xp=60, death_function=monster_death), ai=Wandering()),
+        "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, hunger=1000, defense=5, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
 
         "Taikajuoma": Object(0, 0, "!", "Taikajuoma", libtcod.purple,blocks=False, item = Item(use_function=spell_heal,use_arguments=[10])),
         "Puukko": Object(0, 0, "/", "Puukko", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=2)),
@@ -604,18 +611,18 @@ def new_object(what):
         "Sauva": Object(0, 0, "/", "Sauva", libtcod.white, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=15)),
         "Kilpi": Object(0, 0, "[", "Kilpi", libtcod.white, blocks=False, equipment=Equipment("vasen nyrkki", defense_bonus=5)),
         "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, item=Item(use_function=spell_eat,use_arguments=[20])),
+        "Mokkapala": Object(0, 0, "%", "Mokkapala", libtcod.Color(210,105,30), blocks=False, item = Item(use_function=spell_eat,use_arguments=[15])),
         "Impostor_kakku": Object(0, 0, "%", "Kakku", libtcod.gray, blocks=False, item=Item(use_function=spell_explode)),
         "Arkku": Object(0, 0, "=", "Arkku", libtcod.yellow, blocks=False, actions={"interact":arkku_interact}),
     }
     return objects_list[what]
 #defines objects/monsters spawnrate
 spawn={
-    1: {"monsters":2,"monster":{"Sompi":99,"Morko":1},"items":1,"item":{"Arkku":90,"Kakku":10},"-rooms":1,"+rooms":6},
-    4: {"monsters":4,"monster":{"Sompi":59,"Morko":11,"Kaareni":30},"items":3,"item":{"Puukko":30,"Taikajuoma":60,"Arkku":10},"-rooms":3,"+rooms":6},
-    7: {"monsters":4,"monster":{"Morko":90,"Sompi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10, "Taikajuoma":50,"Miekka":20,"Kakku":10,"Impostor_kakku":10,"Sauva": 5},"-rooms":1, "+rooms":8},
-    11: {"monsters":3,"monster":{"Morko":60,"Kyrssi":18,"Tomuttaja":2,"Kaareni":20},"items":1,"item":{"Kilpi":1,"Taikajuoma":68,"Miekka":1,"Impostor_kakku":5,"Kakku":10,"Arkku":15,"Sauva":5},"-rooms":5, "+rooms":12},
+    1: {"monsters":2,"monster":{"Sompi":99,"Morko":1},"items":1,"item":{"Arkku":90,"Kakku":10, "Mokkapala":10},"-rooms":1,"+rooms":6},
+    4: {"monsters":4,"monster":{"Sompi":59,"Morko":11,"Kaareni":30},"items":3,"item":{"Puukko":30,"Taikajuoma":60,"Arkku":10, "Kakku":5,"Mokkapala":5},"-rooms":3,"+rooms":6},
+    7: {"monsters":4,"monster":{"Morko":90,"Sompi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10, "Taikajuoma":50,"Miekka":20,"Kakku":10, "Mokkapala":10, "Impostor_kakku":10,"Sauva": 5},"-rooms":1, "+rooms":8},
+    11: {"monsters":3,"monster":{"Morko":60,"Kyrssi":18,"Tomuttaja":2,"Kaareni":20},"items":1,"item":{"Kilpi":1,"Taikajuoma":68,"Miekka":1,"Impostor_kakku":5,"Kakku":10, "Mokkapala":10, "Arkku":15,"Sauva":5},"-rooms":5, "+rooms":12},
 }
-
 
 def from_dungeon_level(table):
     #returns a value that depends on level. the table specifies what value occurs after each level, default is 0.
@@ -789,13 +796,18 @@ def create_v_tunnel(y1, y2, x):
 def next_level():
     global dungeon_level
     #advance to the next level
-    message('Otat hetken lepotauon.', libtcod.green)
-    player.fighter.heal(player.fighter.max_hp / 2)  #heal the player by 50%
-
-    message('Harvinaisen rauhanhetken kuluttua jatkat kohti tyrmien uumenia', libtcod.sepia)
-    dungeon_level += 1
-    make_map()  #create a fresh new level!
-    initialize_fov()
+    if player.fighter.hunger > 0:
+        message('Otat hetken lepotauon.', libtcod.green)
+        player.fighter.heal(player.fighter.max_hp / 2)  #heal the player by 50%
+        message('Harvinaisen rauhanhetken kuluttua jatkat kohti tyrmien uumenia.', libtcod.sepia)
+        dungeon_level += 1
+        make_map()  #create a fresh new level!
+        initialize_fov()
+    else:
+        message('Jatkat nälkäisenä kohti tyrmien uumenia.', libtcod.sepia)
+        dungeon_level += 1
+        make_map()  #create a fresh new level!
+        initialize_fov()
 
 def make_map():
     global map, objects, stairs, path_map, rooms
@@ -1004,10 +1016,13 @@ def render_all():
     render_bar(1, 1, BAR_WIDTH, 'HP', player.fighter.hp, player.fighter.max_hp,
         libtcod.green, libtcod.darker_red)
     libtcod.console_set_default_foreground(panel, libtcod.white)
-    libtcod.console_print_ex(panel, 1, 4, libtcod.BKGND_NONE, libtcod.LEFT, 'Tyrmien syvyys ' + str(dungeon_level))
+    render_bar(1, 2, BAR_WIDTH, 'HUNGER', player.fighter.hunger, player.fighter.base_max_hunger,
+        libtcod.Color(210,105,30), libtcod.darker_red)
+    libtcod.console_set_default_foreground(panel, libtcod.white)
+    libtcod.console_print_ex(panel, 1, 5, libtcod.BKGND_NONE, libtcod.LEFT, 'Tyrmien syvyys ' + str(dungeon_level))
     libtcod.console_set_default_foreground(panel, libtcod.yellow)
-    libtcod.console_print_ex(panel, 1, 2, libtcod.BKGND_NONE, libtcod.LEFT, 'Voima/Suoja: ' + str(player.fighter.power) + '/' + str(player.fighter.defense))
-    libtcod.console_print_ex(panel, 1, 3, libtcod.BKGND_NONE, libtcod.LEFT, 'Kokemus: ' + str(player.level))
+    libtcod.console_print_ex(panel, 1, 3, libtcod.BKGND_NONE, libtcod.LEFT, 'Voima/Suoja: ' + str(player.fighter.power) + '/' + str(player.fighter.defense))
+    libtcod.console_print_ex(panel, 1, 4, libtcod.BKGND_NONE, libtcod.LEFT, 'Kokemus: ' + str(player.level))
 
     #print the game messages, one line at a time
     y = 1
