@@ -221,6 +221,13 @@ class Object:
         if blocking==None:
             self.x += dx
             self.y += dy
+            if self.fighter and self.fighter.hunger > 0:
+                self.fighter.hunger -= 0.05
+            if self.fighter and self.fighter.hunger < 5:
+                self.fighter.take_damage(0.2)
+                playsound('assets/sounds/playerhit.wav')
+            if self.fighter and self.fighter.hunger > 10 and self.fighter.hp<self.fighter.base_max_hp:
+                self.fighter.hp+=0.5
             #self.send_to_fore()
             bump = get_object(self.x + dx, self.y + dy)
             if bump!=None and "bump" in bump.actions:
@@ -282,8 +289,6 @@ class Fighter:
         self.base_power = power
         self.fight_messages=fight_messages
     def take_damage(self, damage,attacker=None):
-        if self.hunger > 0:
-            self.hunger -= 2
         #apply damage if possible
         if damage > 0:
             self.hp -= damage
@@ -298,6 +303,8 @@ class Fighter:
     def attack(self, target):
         #a simple formula for attack damage
         damage = self.power - target.fighter.defense
+        if self.hunger > 0:
+            self.hunger -= 0.2
         colorr=[libtcod.red,libtcod.green]
         if self.owner.player:
             colorr=[libtcod.green,libtcod.red]
@@ -382,11 +389,12 @@ class AdvancedMonster:
                     self.path = libtcod.path_new_using_map(path_map)
             except:
                 self.path = libtcod.path_new_using_map(path_map)
-            success=libtcod.path_compute(self.path, monster.x, monster.y, player.x, player.y)
-            stepx,stepy=libtcod.path_walk(self.path,True)
-            #move towards player if far away
-            if monster.distance_to(player) >= 2 and success:
-                moved=monster.move(stepx-monster.x,stepy-monster.y)
+            if libtcod.map_is_in_fov(fov_map,monster.x,monster.y):
+                success=libtcod.path_compute(self.path, monster.x, monster.y, player.x, player.y)
+                stepx,stepy=libtcod.path_walk(self.path,True)
+                #move towards player if far away
+                if monster.distance_to(player) >= 2 and success:
+                    moved=monster.move(stepx-monster.x,stepy-monster.y)
             #close enough, attack! (if the player is still alive.)
         for object in objects:
             if object!=monster and hasattr(object,"fighter") and object.fighter is not None and monster.distance_to(object) < 2 and object.fighter.hp>0 and not (object==player and moved):
@@ -610,8 +618,8 @@ def new_object(what):
         "Miekka": Object(0, 0, "/", "Miekka", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=5)),
         "Sauva": Object(0, 0, "/", "Sauva", libtcod.white, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=15)),
         "Kilpi": Object(0, 0, "[", "Kilpi", libtcod.white, blocks=False, equipment=Equipment("vasen nyrkki", defense_bonus=5)),
-        "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, item=Item(use_function=spell_eat,use_arguments=[20])),
-        "Mokkapala": Object(0, 0, "%", "Mokkapala", libtcod.Color(210,105,30), blocks=False, item = Item(use_function=spell_eat,use_arguments=[15])),
+        "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, item=Item(use_function=spell_eat,use_arguments=[8])),
+        "Mokkapala": Object(0, 0, "%", "Mokkapala", libtcod.Color(210,105,30), blocks=False, item = Item(use_function=spell_eat,use_arguments=[5])),
         "Impostor_kakku": Object(0, 0, "%", "Kakku", libtcod.gray, blocks=False, item=Item(use_function=spell_explode)),
         "Arkku": Object(0, 0, "=", "Arkku", libtcod.yellow, blocks=False, actions={"interact":arkku_interact}),
     }
@@ -796,18 +804,11 @@ def create_v_tunnel(y1, y2, x):
 def next_level():
     global dungeon_level
     #advance to the next level
-    if player.fighter.hunger > 0:
-        message('Otat hetken lepotauon.', libtcod.green)
-        player.fighter.heal(player.fighter.max_hp / 2)  #heal the player by 50%
-        message('Harvinaisen rauhanhetken kuluttua jatkat kohti tyrmien uumenia.', libtcod.sepia)
-        dungeon_level += 1
-        make_map()  #create a fresh new level!
-        initialize_fov()
-    else:
-        message('Jatkat nälkäisenä kohti tyrmien uumenia.', libtcod.sepia)
-        dungeon_level += 1
-        make_map()  #create a fresh new level!
-        initialize_fov()
+    message('Otat hetken lepotauon.', libtcod.green)
+    message('Harvinaisen rauhanhetken kuluttua jatkat kohti tyrmien uumenia.', libtcod.sepia)
+    dungeon_level += 1
+    make_map()  #create a fresh new level!
+    initialize_fov()
 
 def make_map():
     global map, objects, stairs, path_map, rooms
@@ -1052,7 +1053,7 @@ def render_bar(x, y, total_width, name, value, maximum, bar_color, back_color):
     #finally, some centered text with the values
     libtcod.console_set_default_foreground(panel, libtcod.black)
     libtcod.console_print_ex(panel, x + int(total_width/2), y, libtcod.BKGND_NONE, libtcod.CENTER,
-        name + ': ' + str(value) + '/' + str(maximum))
+        name + ': ' + str(math.floor(value)) + '/' + str(math.floor(maximum)))
 
 def handle_keys():
     global fov_recompute
@@ -1236,4 +1237,5 @@ def main_menu():
             play_game()
         elif choice == 2:  #quit
             break
+    save_game()
 main_menu()
