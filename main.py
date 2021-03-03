@@ -578,7 +578,7 @@ def spell_explode(caster,parent,arguments):
 def arkku_interact(object):
     message("Avaat arkun",libtcod.green)
     loot=[]
-    possible=["Taikajuoma","Miekka", "Kilpi","Kakku", "Mokkapala", "Impostor_kakku"]
+    possible=["Taikajuoma", "Miekka", "Kilpi", "Kakku", "Mokkapala", "Impostor_kakku", "Vihreä kuula"]
     morkoarkku=False
     if libtcod.random_get_int(0,1,30)==1:
         morkoarkku=True
@@ -621,13 +621,14 @@ def new_object(what):
         "Kilpi": Object(0, 0, "[", "Kilpi", libtcod.white, blocks=False, info={"actions":"O: ota"}, equipment=Equipment("vasen nyrkki", defense_bonus=5)),
         "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, info={"actions":"O: ota"}, item=Item(use_function=spell_eat,use_arguments=[8])),
         "Mokkapala": Object(0, 0, "%", "Mokkapala", libtcod.Color(210,105,30), blocks=False, info={"O: ota"}, item = Item(use_function=spell_eat,use_arguments=[5])),
+        "Vihreä kuula": Object(0, 0, "o", "Vihreä kuula", libtcod.green, blocks=False, item = Item(use_function=spell_eat,use_arguments=[3])),
         "Impostor_kakku": Object(0, 0, "%", "Kakku", libtcod.gray, blocks=False, info={"actions":"O: ota"}, item=Item(use_function=spell_explode)),
         "Arkku": Object(0, 0, "=", "Arkku", libtcod.yellow, blocks=False, info={"actions":"O: Avaa"}, actions={"interact":arkku_interact}),
     }
     return objects_list[what]
 #defines objects/monsters spawnrate
 spawn={
-    1: {"monsters":2,"monster":{"Sompi":99,"Morko":1},"items":1,"item":{"Arkku":90,"Kakku":10, "Mokkapala":10},"-rooms":1,"+rooms":6},
+    1: {"monsters":2,"monster":{"Sompi":99,"Morko":1},"items":1,"item":{"Arkku":90,"Kakku":10,"Mokkapala":10,"Vihreä kuula":5},"-rooms":1,"+rooms":6},
     4: {"monsters":4,"monster":{"Sompi":59,"Morko":11,"Kaareni":30},"items":3,"item":{"Puukko":30,"Taikajuoma":60,"Arkku":10, "Kakku":5,"Mokkapala":5},"-rooms":3,"+rooms":6},
     7: {"monsters":4,"monster":{"Morko":90,"Sompi":9,"Tomuttaja":1},"items":3,"item":{"Puukko":10, "Taikajuoma":50,"Miekka":20,"Kakku":10, "Mokkapala":10, "Impostor_kakku":10,"Sauva": 5},"-rooms":1, "+rooms":8},
     11: {"monsters":3,"monster":{"Morko":60,"Kyrssi":18,"Tomuttaja":2,"Kaareni":20},"items":1,"item":{"Kilpi":1,"Taikajuoma":68,"Miekka":1,"Impostor_kakku":5,"Kakku":10, "Mokkapala":10, "Arkku":15,"Sauva":5},"-rooms":5, "+rooms":12},
