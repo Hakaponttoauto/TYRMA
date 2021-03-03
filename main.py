@@ -185,7 +185,7 @@ class Rect:
 class Object:
     #this is a generic object: the player, a monster, an item, the stairs...
     #it's always represented by a character on screen.
-    def __init__(self, x, y, char, name, color, blocks=False, actions={}, fighter=None, ai=None, item=None, equipment=None, player=False):
+    def __init__(self, x, y, char, name, color, blocks=False, actions={}, info={}, fighter=None, ai=None, item=None, equipment=None, player=False):
         self.name = name
         self.blocks = blocks
         self.x = x
@@ -195,6 +195,7 @@ class Object:
         self.player = player
 
         self.actions=actions
+        self.info=info
 
         self.fighter = fighter
         if self.fighter:  #let the fighter component know who owns it
@@ -222,7 +223,7 @@ class Object:
             self.x += dx
             self.y += dy
             if self.fighter and self.fighter.hunger > 0:
-                self.fighter.hunger -= 0.05
+                self.fighter.hunger -= 0.02
             if self.fighter and self.fighter.hunger < 5:
                 self.fighter.take_damage(0.2)
                 playsound('assets/sounds/playerhit.wav')
@@ -267,12 +268,12 @@ class Object:
         return math.sqrt(dx ** 2 + dy ** 2)
 
     def send_to_back(self):
-        #This code bugs, remember to fix it before using.
         global objects
         objects.remove(self)
         objects.insert(0, self)
 
     def send_to_fore(self):
+        #This code bugs, remember to fix it before using.
         global objects
         objects.remove(self)
         objects.append(self)
@@ -613,15 +614,15 @@ def new_object(what):
         "Kaareni": Object(0, 0, "C", "Kaareni", libtcod.gray,blocks=True, fighter=Fighter(hp=20, hunger=1000, defense=0, power=20, xp=60, death_function=monster_death), ai=Wandering()),
         "Tomuttaja": Object(0, 0, "T", "Tomuttaja", libtcod.red,blocks=True, fighter=Fighter(hp=10, hunger=1000, defense=5, power=10, xp=100, death_function=monster_death), ai=AdvancedMonster()),
 
-        "Taikajuoma": Object(0, 0, "!", "Taikajuoma", libtcod.purple,blocks=False, item = Item(use_function=spell_heal,use_arguments=[10])),
-        "Puukko": Object(0, 0, "/", "Puukko", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=2)),
-        "Miekka": Object(0, 0, "/", "Miekka", libtcod.gray, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=5)),
-        "Sauva": Object(0, 0, "/", "Sauva", libtcod.white, blocks=False, equipment=Equipment("oikea nyrkki", power_bonus=15)),
-        "Kilpi": Object(0, 0, "[", "Kilpi", libtcod.white, blocks=False, equipment=Equipment("vasen nyrkki", defense_bonus=5)),
-        "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, item=Item(use_function=spell_eat,use_arguments=[8])),
-        "Mokkapala": Object(0, 0, "%", "Mokkapala", libtcod.Color(210,105,30), blocks=False, item = Item(use_function=spell_eat,use_arguments=[5])),
-        "Impostor_kakku": Object(0, 0, "%", "Kakku", libtcod.gray, blocks=False, item=Item(use_function=spell_explode)),
-        "Arkku": Object(0, 0, "=", "Arkku", libtcod.yellow, blocks=False, actions={"interact":arkku_interact}),
+        "Taikajuoma": Object(0, 0, "!", "Taikajuoma", libtcod.purple,blocks=False, info={"actions":"O: ota"}, item = Item(use_function=spell_heal,use_arguments=[10])),
+        "Puukko": Object(0, 0, "/", "Puukko", libtcod.gray, blocks=False, info={"actions":"O: ota"}, equipment=Equipment("oikea nyrkki", power_bonus=2)),
+        "Miekka": Object(0, 0, "/", "Miekka", libtcod.gray, blocks=False, info={"actions":"O: ota"}, equipment=Equipment("oikea nyrkki", power_bonus=5)),
+        "Sauva": Object(0, 0, "/", "Sauva", libtcod.white, blocks=False, info={"actions":"O: ota"}, equipment=Equipment("oikea nyrkki", power_bonus=15)),
+        "Kilpi": Object(0, 0, "[", "Kilpi", libtcod.white, blocks=False, info={"actions":"O: ota"}, equipment=Equipment("vasen nyrkki", defense_bonus=5)),
+        "Kakku": Object(0, 0, "%", "Kakku", libtcod.white, blocks=False, info={"actions":"O: ota"}, item=Item(use_function=spell_eat,use_arguments=[8])),
+        "Mokkapala": Object(0, 0, "%", "Mokkapala", libtcod.Color(210,105,30), blocks=False, info={"O: ota"}, item = Item(use_function=spell_eat,use_arguments=[5])),
+        "Impostor_kakku": Object(0, 0, "%", "Kakku", libtcod.gray, blocks=False, info={"actions":"O: ota"}, item=Item(use_function=spell_explode)),
+        "Arkku": Object(0, 0, "=", "Arkku", libtcod.yellow, blocks=False, info={"actions":"O: Avaa"}, actions={"interact":arkku_interact}),
     }
     return objects_list[what]
 #defines objects/monsters spawnrate
@@ -668,8 +669,13 @@ def player_move_or_attack(dx, dy):
 
 def get_names(x,y):
     #create a list with the names of all objects at the mouse's coordinates and in FOV
-    names = [obj.name for obj in objects
-        if obj.x == x and obj.y == y and not(obj.player) and libtcod.map_is_in_fov(fov_map, obj.x, obj.y)]
+    names = []
+    for obj in objects:
+        if obj.x == x and obj.y == y and not(obj.player):
+            name=obj.name
+            if "actions" in obj.info:
+                name+=" ("+obj.info["actions"]+")"
+            names.append(name)
 
     namestr = ', '.join(names)  #join the names, separated by commas
     if len(names)>0:
@@ -889,7 +895,7 @@ def make_map():
     if random.randint(0,10)<1:
         randomwalk(random.randint(50,500))
     #create stairs at the center of the last room
-    stairs = Object(new_x, new_y, '<', 'portaat', libtcod.white)
+    stairs = Object(new_x, new_y, '<', 'portaat', libtcod.white, info={"actions":"P: Seuraava taso"})
     objects.append(stairs)
     stairs.send_to_back()  #so it's drawn below the monsters
     path_map = libtcod.map_new(MAP_WIDTH, MAP_HEIGHT)
